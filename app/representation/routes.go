@@ -4,68 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/SantiagoZuluaga/GoAuth/app/data"
 	"github.com/SantiagoZuluaga/GoAuth/app/domain"
+	"github.com/SantiagoZuluaga/GoAuth/app/representation/user"
 	"github.com/gorilla/mux"
 )
-
-type ResponseToken struct {
-	Token string `json:"token"`
-}
-
-func indexHandler(response http.ResponseWriter, request *http.Request) {
-
-}
-
-func signinHandler(w http.ResponseWriter, r *http.Request) {
-	var user data.User
-	err := json.NewDecoder(r.Body).Decode(&user)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode("Error")
-		return
-	}
-
-	jwt, err := domain.GenerateJWT(user)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode("Error")
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ResponseToken{
-		Token: jwt,
-	})
-}
-
-func signupHandler(w http.ResponseWriter, r *http.Request) {
-	var user data.User
-	err := json.NewDecoder(r.Body).Decode(&user)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode("Error")
-		return
-	}
-
-	jwt, err := domain.GenerateJWT(user)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode("Error")
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ResponseToken{
-		Token: jwt,
-	})
-}
 
 func validateHandler(w http.ResponseWriter, r *http.Request) {
 	valid, message := domain.ValidateToken(r)
@@ -81,12 +23,27 @@ func validateHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(message)
 }
 
+func notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode("ERROR 404")
+}
+
+func CORS(next http.HandlerFunc) http.HandlerFunc {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		next(w, r)
+	})
+}
+
 func Router() *mux.Router {
 
 	router := mux.NewRouter()
-	//router.HandleFunc("/", indexHandler)
-	router.HandleFunc("/api/auth/signin", signinHandler).Methods("POST")
-	router.HandleFunc("/api/auth/signup", signupHandler).Methods("POST")
+	router.HandleFunc("/api/auth/signin", CORS(user.SignInHandler)).Methods("POST")
+	router.HandleFunc("/api/auth/signup", CORS(user.SignUpHandler)).Methods("POST")
 	router.HandleFunc("/api/auth/validate", validateHandler).Methods("GET")
+	router.NotFoundHandler = http.HandlerFunc(notFoundHandler)
 	return router
 }
